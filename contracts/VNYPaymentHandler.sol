@@ -104,28 +104,26 @@ contract VNYPaymentHandler is Ownable, ReentrancyGuard {
     function pay(uint256 feeAmount) external {
         require(feeAmount > 0, "fee must be greater than zero");
 
-        uint256 initVanityAmount = feeToken.balanceOf(address(this));
-
         feeToken.safeTransferFrom(
             msg.sender,
             address(this),
             feeAmount
         );
 
-        feeAmount = feeToken.balanceOf(address(this)).sub(initVanityAmount);
-
         uint256 burnAmount = feeAmount.mul(burnPercent).div(divider);
+        feeToken.safeTransfer(deadAddress, burnAmount); // burn 
+
         uint256 contractAmount = feeAmount.mul(contractPercent).div(divider);
-        uint256 buybackPercent = divider.sub(burnPercent).sub(contractPercent).sub(teamPercent);
-        uint256 teamBuybackAmount = feeAmount.sub(burnAmount).sub(contractAmount);
+        feeToken.safeTransfer(contractWallet, contractAmount);
 
         uint256 initialBalance = address(this).balance;
-        swapTokensForEth(teamBuybackAmount);
+        uint256 teamAmount = feeAmount.mul(teamPercent).div(divider);
+        swapTokensForEth(teamAmount);
         uint256 transferredBalance = address(this).balance.sub(initialBalance);
+        transferToAddressETH(payable(teamWallet), transferredBalance);
 
-        feeToken.safeTransfer(deadAddress, burnAmount); // burn
-        feeToken.safeTransfer(contractWallet, contractAmount);
-        transferToAddressETH(payable(teamWallet), transferredBalance.mul(teamPercent).div(teamPercent.add(buybackPercent)));
+        uint256 buybackAmount = feeAmount.sub(burnAmount).sub(contractAmount).sub(teamAmount);
+        swapTokensForEth(buybackAmount);
     }
 
     function swapAllTokensForEth() external onlyOperator {
