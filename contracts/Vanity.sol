@@ -428,13 +428,20 @@ library Address {
  * the owner.
  */
 contract Ownable is Context {
-    address public _owner = 0x8a6AAe4B05601CDe4cecbb99941f724D7292867b;
+    address private _owner;
     address private _previousOwner;
     uint256 private _lockTime;
 
     event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
 
-    
+    /**
+     * @dev Initializes the contract setting the deployer as the initial owner.
+     */
+    constructor () {
+        address msgSender = _msgSender();
+        _owner = msgSender;
+        emit OwnershipTransferred(address(0), msgSender);
+    }
 
     /**
      * @dev Returns the address of the current owner.

@@ -84,12 +84,12 @@ contract VNYPaymentHandler is Ownable, ReentrancyGuard {
     }
 
     constructor( ) {
-        feeToken = ERC20(0xD439b09E7aEBf2F00D0e1985eD8cEA136B37A5Bc);
+        feeToken = ERC20(0xa300372112EF4e7499bDb7699B9627F354FB78C9);
         burnPercent = 30;
         divider = 100;
 
         contractPercent = 15;
-        contractWallet = 0xD439b09E7aEBf2F00D0e1985eD8cEA136B37A5Bc;
+        contractWallet = 0xa300372112EF4e7499bDb7699B9627F354FB78C9;
 
         teamPercent = 10;
         teamWallet = 0xDEAD1337F2Ede31413CB39B0cf97909b6F107DB6;
@@ -104,26 +104,28 @@ contract VNYPaymentHandler is Ownable, ReentrancyGuard {
     function pay(uint256 feeAmount) external {
         require(feeAmount > 0, "fee must be greater than zero");
 
+        uint256 initVanityAmount = feeToken.balanceOf(address(this));
+
         feeToken.safeTransferFrom(
             msg.sender,
             address(this),
             feeAmount
         );
 
-        uint256 burnAmount = feeAmount.mul(burnPercent).div(divider);
-        feeToken.safeTransfer(deadAddress, burnAmount); // burn 
+        feeAmount = feeToken.balanceOf(address(this)).sub(initVanityAmount);
 
+        uint256 burnAmount = feeAmount.mul(burnPercent).div(divider);
         uint256 contractAmount = feeAmount.mul(contractPercent).div(divider);
-        feeToken.safeTransfer(contractWallet, contractAmount);
+        uint256 buybackPercent = divider.sub(burnPercent).sub(contractPercent).sub(teamPercent);
+        uint256 teamBuybackAmount = feeAmount.sub(burnAmount).sub(contractAmount);
 
         uint256 initialBalance = address(this).balance;
-        uint256 teamAmount = feeAmount.mul(teamPercent).div(divider);
-        swapTokensForEth(teamAmount);
+        swapTokensForEth(teamBuybackAmount);
         uint256 transferredBalance = address(this).balance.sub(initialBalance);
-        transferToAddressETH(payable(teamWallet), transferredBalance);
 
-        uint256 buybackAmount = feeAmount.sub(burnAmount).sub(contractAmount).sub(teamAmount);
-        swapTokensForEth(buybackAmount);
+        feeToken.safeTransfer(deadAddress, burnAmount); // burn
+        feeToken.safeTransfer(contractWallet, contractAmount);
+        transferToAddressETH(payable(teamWallet), transferredBalance.mul(teamPercent).div(teamPercent.add(buybackPercent)));
     }
 
     function swapAllTokensForEth() external onlyOperator {
